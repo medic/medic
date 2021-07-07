@@ -57,7 +57,7 @@
       <div id="message-footer"
         class="reply message-form"
         [ngClass]="{sending: textAreaFocused || send.message?.length}"
-        *ngIf="selectedConversation.messages[0] && (selectedConversation.contact?.name || selectedConversation.contact?.doc)">
+        *ngIf="selectedConversation.messages[0] && (selectedConversation.contact?.name || selectedConversation.contact?.doc?.name)">
 
         <div class="control-group">
           <div class="controls">
