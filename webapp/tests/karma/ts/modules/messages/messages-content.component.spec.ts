@@ -1,9 +1,10 @@
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateFakeLoader, TranslateLoader, TranslateModule } from '@ngx-translate/core';
 import { RouterTestingModule } from '@angular/router/testing';
+import { By } from '@angular/platform-browser';
 import { provideMockStore } from '@ngrx/store/testing';
 import sinon from 'sinon';
-import { expect, assert } from 'chai';
+import { assert, expect } from 'chai';
 import { Observable } from 'rxjs';
 
 import { MessagesContentComponent } from '@mm-modules/messages/messages-content.component';
@@ -243,6 +244,46 @@ describe('MessagesContentComponent', () => {
       expect(updateSelectedConversationSpy.callCount).to.equal(0);
       expect(removeMessageFromSelectedConversationSpy.callCount).to.equal(1);
       expect(removeMessageFromSelectedConversationSpy.args[0]).to.deep.equal(['message2']);
+    });
+  });
+
+  describe('New message section', () => {
+    it('should display the "new message" section in a conversation with a known recipient', async () => {
+      component.selectedConversation = {
+        'id': '7aeaa4bc-ae5e-4964-8771-697209d2c6dd',
+        'messages': [
+          { 'id': '68e4ae1a-bb6c-4561-98e7-3f7cdfd00486' }
+        ],
+        'contact': {
+          'doc': { 'name': 'Groot' }
+        }
+      };
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const footer = fixture.debugElement.query(By.css('#message-footer'))?.nativeElement;
+      expect(footer).to.not.be.undefined;
+    });
+
+    it('should hide the "new message" section in a conversation with an unknown recipient', async () => {
+      component.selectedConversation = {
+        'id': '52c1de4a-33dd-4d22-9916-24e7c77451f5',
+        'messages': [
+          { 'id': '40b0678a-0f16-47cb-8591-fb3eab3b81d2' }
+        ],
+        'contact': {
+          'doc': {
+            'name': ''
+          }
+        }
+      };
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const footer = fixture.debugElement.query(By.css('#message-footer'))?.nativeElement;
+      expect(footer).to.be.undefined;
     });
   });
 });
