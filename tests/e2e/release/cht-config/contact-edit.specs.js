@@ -8,6 +8,9 @@ const healthCenterId = uuid.v4();
 const healtchCenterName = uuid.v4();
 const personName = uuid.v4();
 const personId = uuid.v4();
+const personFactory = require('../../../factories/cht/contacts/person');
+const place = require('../../../factories/cht/contacts/place');
+
 
 describe('Editing contacts with the CHT config', () => {
   beforeAll(() => utils.saveDocs(expectedDocs));
@@ -57,5 +60,40 @@ describe('Editing contacts with the CHT config', () => {
     await commonElements.confirmDelete();
     await contactPage.selectLHSRowByText(healtchCenterName);
     expect(await contactPage.peopleRows.count()).toBe(0);
+  });
+
+  it('should change primary contact', async () => {
+    const district = place.generateHierarchy(['district_hospital'])[0];
+    const originalContact = personFactory.build(
+      {
+        parent: {
+          _id: district._id,
+          parent: district.parent
+        }
+      });
+    
+    const secondContact = personFactory.build(
+      {
+        parent: {
+          _id: district._id,
+          parent: district.parent
+        }
+      });
+    district.contact = originalContact;
+    await utils.saveDocs([district, originalContact, secondContact]);
+    await browser.refresh();
+
+    //change contact
+    await utils.request({
+      path: `/api/v1/places/${district._id}`,
+      method: 'POST',
+      body: {
+        contact: secondContact._id
+      }
+    });
+
+    await browser.refresh();
+    const newDistrict = await utils.getDoc(district._id);
+    expect(newDistrict.contact._id).toBe(secondContact._id);
   });
 });
