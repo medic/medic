@@ -7,11 +7,9 @@ services:
     volumes:
       - medic-data:/srv
     ports:
-     - 80:80
-     - 443:443
+     - "${MEDIC_HTTP:-80}:80"
+     - "${MEDIC_HTTPS:-443}:443"
     working_dir: /srv
-    depends_on:
-      - haproxy
     networks:
       - medic-net
     environment:
@@ -21,6 +19,8 @@ services:
   haproxy:
     container_name: haproxy
     image: medicmobile/haproxy:rc-1.17
+    depends_on:
+      - medic-os
     volumes:
       - medic-data:/srv
     environment:
