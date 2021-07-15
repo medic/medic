@@ -18,6 +18,7 @@ const octokit = new Octokit({
 });
 
 const OWNER = 'medic';
+const ISSUE_STATE = 'all';
 
 const REPO_NAME = process.argv[2];
 if (!REPO_NAME) {
@@ -87,8 +88,8 @@ const getIssues = async (milestoneId) => {
     owner: OWNER,
     repo: REPO_NAME,
     milestone: milestoneId,
-    per_page: 100,
-    state: 'all',
+    state: ISSUE_STATE,
+    per_page: 100
   });
   return validateIssues(issues);
 };
