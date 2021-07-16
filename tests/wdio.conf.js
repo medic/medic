@@ -1,5 +1,5 @@
-const constants = require('../constants');
-const utils = require('../utils');
+const constants = require('./constants');
+const utils = require('./utils');
 const allure = require('allure-commandline');
 
 const baseConfig = {
@@ -28,7 +28,7 @@ const baseConfig = {
   // will be called from there.
   // 
   specs: [
-    './tests/webdriver-e2e/specs/**/*.spec.js'
+    './tests/e2e/**/*.wdio-spec.js'
   ],
   // Patterns to exclude.
   exclude: [
@@ -61,7 +61,7 @@ const baseConfig = {
     // maxInstances can get overwritten per capability. So if you have an in-house Selenium
     // grid with only 5 firefox instances available you can make sure that not more than
     // 5 instances get started at a time.
-    maxInstances: 5,
+    maxInstances: 1,
     //
     browserName: 'chrome',
     acceptInsecureCerts: true,
@@ -81,7 +81,7 @@ const baseConfig = {
   // Define all options that are relevant for the WebdriverIO instance here
   //
   // Level of logging verbosity: trace | debug | info | warn | error | silent
-  logLevel: 'error',
+  logLevel: process.env.LOGLEVEL || 'error',
   //
   // Set specific log levels per logger
   // loggers:
@@ -146,8 +146,7 @@ const baseConfig = {
   reporters: [
     ['allure', {
       outputDir: 'allure-results',
-      disableWebdriverStepsReporting  : true,
-      disableWebdriverScreenshotsReporting: true,
+      disableWebdriverStepsReporting: true
     }],
     'spec',
   ],
@@ -259,7 +258,8 @@ const baseConfig = {
    * @param {Number} result 0 - command success, 1 - command error
    * @param {Object} error error object if any
    */
-  // afterCommand: function (commandName, args, result, error) {
+  // afterCommand: async function (commandName, args, result, error) {
+  //   await browser.takeScreenshot();
   // },
   /**
    * Gets executed after all tests are done. You still have access to all global variables from
@@ -276,9 +276,9 @@ const baseConfig = {
    * @param {Array.<Object>} capabilities list of capabilities details
    * @param {Array.<String>} specs List of spec file paths that ran
    */
-  afterSession: function () {
-    utils.tearDownServices();
-  },
+  // afterSession: function () {
+
+  // },
   /**
    * Gets executed after all workers got shut down and the process is about to exit. An error
    * thrown in the onComplete hook will result in the test run failing.
@@ -288,6 +288,7 @@ const baseConfig = {
    * @param {<Object>} results object containing test results
    */
   onComplete: function () {
+    utils.tearDownServices();
     const reportError = new Error('Could not generate Allure report');
     const timeoutError = new Error('Timeout generating report');
     const generation = allure(['generate', 'allure-results', '--clean']);

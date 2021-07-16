@@ -102,3 +102,16 @@ Documented here are two ways to run individual tests and have your IDE break on 
 1. Click the run configuration dropdown and select the protractor config. 
 1. In a terminal run `grunt e2e-deploy`   NOTE: This has to happen each time you run. 
 1. Click debug button in IntelliJ.
+
+
+## Migration To Webdriver IO
+
+Treat the migration as if you were writing a brand new e2e suite. Not everything we have in the protractor suite needs a 1 to 1 migration. The implicit waits seem to work better in wdio
+
+Each spec file runs independently. There is no need to manage browser state between spec files. 
+
+
+
+### Glossary 
+
+wdio = WebdriverIo
