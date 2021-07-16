@@ -1,12 +1,16 @@
 import { Injectable } from '@angular/core';
 
+import { AuthService } from '@mm-services/auth.service';
+
 @Injectable({
   providedIn: 'root'
 })
 export class HeaderTabsService {
-  constructor() {}
+  constructor(
+    private authService: AuthService
+  ) { }
 
-  private readonly tabs = [
+  private readonly tabs: HeaderTab[] = [
     {
       name: 'messages',
       route: 'messages',
@@ -56,8 +60,16 @@ export class HeaderTabsService {
     }
   ];
 
-  get(settings:any = {}) {
-    if (!settings.header_tabs) {
+  /**
+   * Returns the list of header tabs.
+   * If settings are passed as parameter, then it will add the tab.icon and tab.resourceIcon when available.
+   *
+   * @param settings {Object} Settings of CHT-Core instance.
+   *
+   * @returns HeaderTab[]
+   */
+  get(settings?): HeaderTab[] {
+    if (!settings?.header_tabs) {
       return this.tabs;
     }
 
@@ -69,6 +81,7 @@ export class HeaderTabsService {
       if (settings.header_tabs[tab.name].icon && settings.header_tabs[tab.name].icon.startsWith('fa-')) {
         tab.icon = settings.header_tabs[tab.name].icon;
       }
+
       if (settings.header_tabs[tab.name].resource_icon) {
         tab.resourceIcon = settings.header_tabs[tab.name].resource_icon;
       }
@@ -76,4 +89,44 @@ export class HeaderTabsService {
 
     return this.tabs;
   }
+
+  /**
+   * Returns the list of authorized header tabs according to the current user's permissions.
+   * If settings are passed as parameter, then it will add the tab.icon and tab.resourceIcon when available.
+   *
+   * @param settings {Object} Settings of CHT-Core instance.
+   *
+   * @returns Promise<HeaderTab[]>
+   */
+  async getAuthorizedTabs(settings?): Promise<HeaderTab[]> {
+    const tabs = this.get(settings);
+    const tabAuthorization = await Promise.all(tabs.map(tab => this.authService.has(tab.permissions)));
+
+    return tabs.filter((tab, index) => tabAuthorization[index]);
+  }
+
+  /**
+   * Returns the primary tab according to the current user's permissions.
+   * If settings are passed as parameter, then it will add the tab.icon and tab.resourceIcon when available.
+   *
+   * @param settings {Object} Settings of CHT-Core instance.
+   *
+   * @returns Promise<HeaderTab>
+   */
+  async getPrimaryTab(settings?): Promise<HeaderTab> {
+    const tabs = await this.getAuthorizedTabs(settings);
+
+    return tabs?.[0];
+  }
+}
+
+interface HeaderTab {
+  name: string;
+  route: string;
+  defaultIcon: string;
+  translation: string;
+  permissions: string[];
+  typeName?: string;
+  icon?: string;
+  resourceIcon?: string;
 }

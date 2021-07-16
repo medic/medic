@@ -1,5 +1,6 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Router } from '@angular/router';
+import { Store } from '@ngrx/store';
 
 import { FeedbackService } from '@mm-services/feedback.service';
 import { GeolocationService } from '@mm-services/geolocation.service';
@@ -7,6 +8,8 @@ import { MRDTService } from '@mm-services/mrdt.service';
 import { SessionService } from '@mm-services/session.service';
 import { RouteSnapshotService } from '@mm-services/route-snapshot.service';
 import { SimprintsService } from '@mm-services/simprints.service';
+import { HeaderTabsService } from '@mm-services/header-tabs.service';
+import { Selectors } from '@mm-selectors/index';
 
 /**
  * An API to provide integration with the medic-android app.
@@ -18,7 +21,11 @@ import { SimprintsService } from '@mm-services/simprints.service';
   providedIn: 'root',
 })
 export class AndroidApiService {
+  private primaryTab;
+  private currentTab;
+
   constructor(
+    private store:Store,
     private feedbackService:FeedbackService,
     private geolocationService:GeolocationService,
     private mrdtService:MRDTService,
@@ -27,7 +34,22 @@ export class AndroidApiService {
     private simprintsService:SimprintsService,
     private zone:NgZone,
     private routeSnapshotService:RouteSnapshotService,
+    private headerTabsService:HeaderTabsService,
   ) {
+    this.subscribeToStore();
+    this.getPrimaryTab();
+  }
+
+  private subscribeToStore() {
+    this.store
+      .select(Selectors.getCurrentTab)
+      .subscribe(currentTab => this.currentTab = currentTab);
+  }
+
+  private getPrimaryTab() {
+    this.headerTabsService
+      .getPrimaryTab() // Not passing settings since icons aren't needed.
+      .then(tab => this.primaryTab = tab);
   }
 
   private runInZone(property:string, args:any[]=[]) {
@@ -129,8 +151,7 @@ export class AndroidApiService {
    *   the android app will handle it as it sees fit.
    */
   back() {
-    // If there's a modal open, close any dropdowns inside it, or try to
-    // close the modal itself.
+    // If there's a modal open, close any dropdowns inside it, or try to close the modal itself.
     const $modals = $('.modal:visible');
     if ($modals.length) {
       this.closeTopModal($modals);
@@ -167,19 +188,14 @@ export class AndroidApiService {
     }
 
     // If we're viewing a tab, but not the primary tab, go to primary tab
-    const primaryTab = $('.header .tabs').find('> a:visible:first');
-    if (!primaryTab.is('.selected')) {
-      const href = primaryTab.attr('href');
-      if (href) {
-        this.router.navigate([href.replace('#','')]);
+    if (this.primaryTab?.name !== this.currentTab) {
+      if (this.primaryTab?.route) {
+        this.router.navigate([ this.primaryTab.route ]);
         return true;
       } else {
-        const message = 'Attempt to back to an undefined state [AndroidApi.back()]';
         this.feedbackService
-          .submit(message)
-          .catch(err => {
-            console.error('Error saving feedback', err);
-          });
+          .submit('Attempt to back to an undefined state [AndroidApi.back()]')
+          .catch(error => console.error('Error saving feedback', error));
       }
     }
 

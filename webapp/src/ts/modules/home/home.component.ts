@@ -16,25 +16,11 @@ export class HomeComponent implements OnInit {
   ) { }
 
   ngOnInit() {
-    return this.findFirstAuthorizedTab().then(route => {
-      if (!route) {
-        this.router.navigate(['error', '403']);
-      } else {
-        this.router.navigate([route]);
-      }
-    });
-  }
-
-  findFirstAuthorizedTab() {
-    const tabs = this.headerTabsService.get();
-    return Promise
-      .all(tabs.map(tab => this.authService.has(tab.permissions)))
-      .then(results => {
-        const idx = results.findIndex(result => result);
-        if (idx === -1) {
-          return;
-        }
-        return tabs[idx].route;
+    return this.headerTabsService
+      .getPrimaryTab() // Not passing settings since icons aren't needed.
+      .then(tab => {
+        const nextRoute = tab?.route ? [ tab.route ] : [ 'error', '403' ];
+        this.router.navigate(nextRoute);
       });
   }
 }

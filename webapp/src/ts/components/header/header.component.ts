@@ -51,6 +51,18 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.subscribeToStore();
+    this.getHeaderTabs();
+    this.tourService
+      .getTours()
+      .then(tours => this.tours = tours);
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
+  }
+
+  private subscribeToStore() {
     const subscription = combineLatest(
       this.store.select(Selectors.getReplicationStatus),
       this.store.select(Selectors.getCurrentTab),
@@ -68,22 +80,16 @@ export class HeaderComponent implements OnInit, OnDestroy {
       this.unreadCount = unreadCount;
     });
     this.subscription.add(subscription);
-
-    this.settingsService.get().then(settings => {
-      const tabs = this.headerTabsService.get(settings);
-      return Promise.all(tabs.map(tab => this.authService.has(tab.permissions))).then(results => {
-        this.permittedTabs = tabs.filter((tab,index) => results[index]);
-        this.globalActions.setMinimalTabs(this.permittedTabs.length > 3);
-      });
-    });
-
-    this.tourService.getTours().then(tours => {
-      this.tours = tours;
-    });
   }
 
-  ngOnDestroy() {
-    this.subscription.unsubscribe();
+  private getHeaderTabs() {
+    this.settingsService
+      .get()
+      .then(settings => this.headerTabsService.getAuthorizedTabs(settings))
+      .then(permittedTabs => {
+        this.permittedTabs = permittedTabs;
+        this.globalActions.setMinimalTabs(this.permittedTabs.length > 3);
+      });
   }
 
   openGuidedSetup() {

@@ -1,8 +1,9 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import { NgZone } from '@angular/core';
 import { Router } from '@angular/router';
+import { MockStore, provideMockStore } from '@ngrx/store/testing';
 
 import { AndroidApiService } from '@mm-services/android-api.service';
 import { SessionService } from '@mm-services/session.service';
@@ -10,7 +11,8 @@ import { GeolocationService } from '@mm-services/geolocation.service';
 import { FeedbackService } from '@mm-services/feedback.service';
 import { MRDTService } from '@mm-services/mrdt.service';
 import { SimprintsService } from '@mm-services/simprints.service';
-
+import { HeaderTabsService } from '@mm-services/header-tabs.service';
+import { Selectors } from '@mm-selectors/index';
 
 describe('AndroidApi service', () => {
 
@@ -22,6 +24,8 @@ describe('AndroidApi service', () => {
   let geolocationService;
   let simprintsService;
   let consoleErrorMock;
+  let headerTabsService;
+  let store;
 
   beforeEach(() => {
     sessionService = {
@@ -58,26 +62,40 @@ describe('AndroidApi service', () => {
       registerResponse: sinon.stub()
     };
 
+    headerTabsService = {
+      getPrimaryTab: sinon.stub().resolves()
+    };
+
+    const mockedSelectors = [
+      { selector: Selectors.getCurrentTab, value: null },
+    ];
+
     consoleErrorMock = sinon.stub(console, 'error');
 
     TestBed.configureTestingModule({
       providers: [
+        provideMockStore({ selectors: mockedSelectors }),
         { provide: SessionService, useValue: sessionService },
         { provide: GeolocationService, useValue: geolocationService },
         { provide: SimprintsService, useValue: simprintsService },
         { provide: FeedbackService, useValue: feedbackService },
         { provide: Router, useValue: router },
         { provide: MRDTService, useValue: mrdtService },
+        { provide: HeaderTabsService, useValue: headerTabsService },
       ],
     });
 
-    service = TestBed.inject(AndroidApiService);
+    store = TestBed.inject(MockStore);
   });
 
   afterEach(() => {
     sinon.restore();
   });
+
   describe('simprintsResponse', () => {
+    beforeEach(() => {
+      service = TestBed.inject(AndroidApiService);
+    });
 
     it('errors when given string id', () => {
       service.v1.simprintsResponse(null, 'hello', null);
@@ -132,6 +150,10 @@ describe('AndroidApi service', () => {
   });
 
   describe('logout', () => {
+    beforeEach(() => {
+      service = TestBed.inject(AndroidApiService);
+    });
+
     it('should call sessionService logout', () => {
       service.logout();
       expect(sessionService.logout.callCount).to.equal(1);
@@ -144,7 +166,10 @@ describe('AndroidApi service', () => {
         data: { name: 'contacts.deceased' },
         params: { id: 'my-contact-id' },
       };
+      service = TestBed.inject(AndroidApiService);
+
       service.back();
+
       expect(router.navigate.callCount).to.equal(1);
       expect(router.navigate.args[0]).to.deep.equal([['/contacts', 'my-contact-id']]);
     });
@@ -154,7 +179,10 @@ describe('AndroidApi service', () => {
         params: { id: 'my-contact-id' },
         parent: { routeConfig: { path: 'contacts' } },
       };
+      service = TestBed.inject(AndroidApiService);
+
       service.back();
+
       expect(router.navigate.callCount).to.equal(1);
       expect(router.navigate.args[0]).to.deep.equal([['/', 'contacts']]);
     });
@@ -164,7 +192,10 @@ describe('AndroidApi service', () => {
         params: { id: 'my-report-id' },
         parent: { routeConfig: { path: 'reports' } },
       };
+      service = TestBed.inject(AndroidApiService);
+
       service.back();
+
       expect(router.navigate.callCount).to.equal(1);
       expect(router.navigate.args[0]).to.deep.equal([['/', 'reports']]);
     });
@@ -174,13 +205,38 @@ describe('AndroidApi service', () => {
         params: { id: 'my-random-id' },
         parent: { routeConfig: { path: 'something' } },
       };
+      service = TestBed.inject(AndroidApiService);
+
       service.back();
+
       expect(router.navigate.callCount).to.equal(1);
       expect(router.navigate.args[0]).to.deep.equal([['/', 'something']]);
     });
 
-    it('should handle other routes', () => {
+    it('should navigate to primaryTab if it is not the current tab', fakeAsync(() => {
+      store.overrideSelector(Selectors.getCurrentTab, 'tasks');
+      store.refreshState();
+      headerTabsService.getPrimaryTab.resolves({ name: 'messages', route: 'messages' });
+      service = TestBed.inject(AndroidApiService);
+      tick();
+
+      const result = service.back();
+
+      expect(result).to.be.true;
+      expect(router.navigate.callCount).to.equal(1);
+      expect(router.navigate.args[0]).to.deep.equal([ ['messages'] ]);
+      expect(feedbackService.submit.callCount).to.equal(0);
+      expect(headerTabsService.getPrimaryTab.callCount).to.equal(1);
+    }));
+
+    it('should submit feedback if routes is missing', fakeAsync(() => {
       feedbackService.submit.resolves();
+      store.overrideSelector(Selectors.getCurrentTab, 'tasks');
+      store.refreshState();
+      headerTabsService.getPrimaryTab.resolves({ name: 'messages', route: null });
+      service = TestBed.inject(AndroidApiService);
+      tick();
+
       service.back();
       // this test is temporary
       // issue: https://github.com/medic/cht-core/issues/6698
@@ -188,10 +244,30 @@ describe('AndroidApi service', () => {
       expect(feedbackService.submit.args[0]).to.deep.equal(
         ['Attempt to back to an undefined state [AndroidApi.back()]']
       );
-    });
+      expect(router.navigate.callCount).to.equal(0);
+    }));
+
+    it('should return false if primaryTab is the current tab', fakeAsync(() => {
+      store.overrideSelector(Selectors.getCurrentTab, 'messages');
+      store.refreshState();
+      headerTabsService.getPrimaryTab.resolves({ name: 'messages', route: 'messages' });
+      service = TestBed.inject(AndroidApiService);
+      tick();
+
+      const result = service.back();
+
+      expect(result).to.be.false;
+      expect(feedbackService.submit.callCount).to.equal(0);
+      expect(headerTabsService.getPrimaryTab.callCount).to.equal(1);
+      expect(router.navigate.callCount).to.equal(0);
+    }));
   });
 
   describe('mrdtResponse', () => {
+    beforeEach(() => {
+      service = TestBed.inject(AndroidApiService);
+    });
+
     it('should call mrdt.respond with parsed json', () => {
       const response = JSON.stringify({ some: 'response' });
       service.mrdtResponse(response);
@@ -209,6 +285,10 @@ describe('AndroidApi service', () => {
   });
 
   describe('mrdtTimeTakenResponse', () => {
+    beforeEach(() => {
+      service = TestBed.inject(AndroidApiService);
+    });
+
     it('should call mrdt.respondTimeTaken with parsed json', () => {
       const response = JSON.stringify({ some: 'response' });
       service.mrdtTimeTakenResponse(response);
@@ -226,6 +306,10 @@ describe('AndroidApi service', () => {
   });
 
   describe('locationPermissionRequestResolve', () => {
+    beforeEach(() => {
+      service = TestBed.inject(AndroidApiService);
+    });
+
     it('should call geolocation permissionRequestResolved', () => {
       service.locationPermissionRequestResolve();
       expect(geolocationService.permissionRequestResolved.callCount).to.equal(1);
@@ -236,6 +320,7 @@ describe('AndroidApi service', () => {
     let ngZoneRun;
     beforeEach(() => {
       ngZoneRun = sinon.stub(NgZone.prototype, 'run').callsArg(0);
+      service = TestBed.inject(AndroidApiService);
     });
 
     it('should not run in zone if already in zone', () => {
